@@ -129,7 +129,6 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDVK9Xo4URV_hbG133RMhjyiAiCkqLBT4k",
@@ -142,7 +141,6 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const storage = getStorage(app);
 
         const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado'));
 
@@ -239,25 +237,66 @@
             if (el) el.remove();
         }
 
-        async function enviarArquivo(file, caminho) {
-            if (!file) return "";
-            const storageRef = ref(storage, `${caminho}_${Date.now()}_${file.name}`);
-            await uploadBytes(storageRef, file);
-            return await getDownloadURL(storageRef);
+        // Função para converter arquivo de imagem para Base64 compactado
+        function converterParaBase64(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) {
+                    resolve("");
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Redimensiona mantendo proporção (Máximo 1024px de largura/altura)
+                        const MAX_WIDTH = 1024;
+                        const MAX_HEIGHT = 1024;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Converte para JPEG com compressão de 75% para ficar leve
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+                        resolve(dataUrl);
+                    };
+                    img.onerror = (err) => reject(err);
+                };
+                reader.onerror = (error) => reject(error);
+                reader.readAsDataURL(file);
+            });
         }
 
         document.getElementById('formVistoria').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btnEnviar');
             btn.disabled = true;
-            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Enviando arquivos e dados...`;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Processando imagens e enviando...`;
 
             try {
                 const fileCroqui = document.getElementById('fotoCroqui').files[0];
                 const filePoste = document.getElementById('fotoPosteEntrada').files[0];
 
-                const urlCroqui = await enviarArquivo(fileCroqui, "vistorias/croqui");
-                const urlPoste = await enviarArquivo(filePoste, "vistorias/poste");
+                const urlCroqui = await converterParaBase64(fileCroqui);
+                const urlPoste = await converterParaBase64(filePoste);
 
                 // Coletar caixas
                 const caixasArray = [];
@@ -265,7 +304,7 @@
                 for (let item of itensCaixas) {
                     const fInput = item.querySelector('.caixa-foto');
                     const lInput = item.querySelector('.caixa-legenda');
-                    let fotoUrl = fInput.files[0] ? await enviarArquivo(fInput.files[0], "vistorias/caixa") : "";
+                    let fotoUrl = await converterParaBase64(fInput.files[0]);
                     caixasArray.push({
                         legenda: lInput.value || "Caixa Subterrânea",
                         foto: fotoUrl
@@ -278,7 +317,7 @@
                 for (let item of itensDgs) {
                     const fInput = item.querySelector('.dg-foto');
                     const lInput = item.querySelector('.dg-legenda');
-                    let fotoUrl = fInput.files[0] ? await enviarArquivo(fInput.files[0], "vistorias/dg") : "";
+                    let fotoUrl = await converterParaBase64(fInput.files[0]);
                     dgsArray.push({
                         legenda: lInput.value || "DG",
                         foto: fotoUrl
