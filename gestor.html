@@ -13,10 +13,28 @@
         .status-bolinha { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
         .bolinha-laranja { background-color: #f97316; }
         .bolinha-verde { background-color: #22c55e; }
+
+        /* Ajuste de Impressão */
         @media print {
-            body * { visibility: hidden; }
-            #modalRelatorioImprimir, #modalRelatorioImprimir * { visibility: visible; }
-            #modalRelatorioImprimir { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; background: white; }
+            body * {
+                visibility: hidden !important;
+            }
+            #modalRelatorioImprimir, #modalRelatorioImprimir * {
+                visibility: visible !important;
+            }
+            #modalRelatorioImprimir {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white;
+                z-index: 99999;
+            }
+            img {
+                max-width: 100% !important;
+                page-break-inside: avoid;
+            }
         }
     </style>
 </head>
